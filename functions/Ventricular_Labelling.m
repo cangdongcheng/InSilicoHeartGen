@@ -586,7 +586,7 @@ warning('off','all')
     centroid_pulm_endo=meshcentroid(node_surf,face_surf(labelfinal3==9,:));
         TR_pulm_endo=delaunayTriangulation(centroid_pulm_endo);
         [~,dist_pulm]=nearestNeighbor(TR_pulm_endo,centroid);
-        labelfinal3(labelfinal2==1 & dist_pulm< 0.35)=19;
+        labelfinal3(labelfinal2==1 & dist_pulm< 3.5)=19;
     
     
  %% detect tricuspid valve endo, using the plane of the mitral surface
@@ -628,7 +628,7 @@ warning('off','all')
         centroid_tri_endo=meshcentroid(node_surf,face_surf(labelfinal3==14,:));
         TR_tri_endo=delaunayTriangulation(centroid_tri_endo);
         [~,dist_tri]=nearestNeighbor(TR_tri_endo,centroid);
-        labelfinal3(labelfinal2==1 & dist_tri< 0.35)=24;
+        labelfinal3(labelfinal2==1 & dist_tri< 3.5)=24;
 
         labelfinals=labelfinal3;
 

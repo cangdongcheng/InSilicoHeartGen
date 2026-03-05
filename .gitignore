@@ -1,0 +1,21 @@
+# Outputs
+outputs/
+
+# Dependencies (large libraries, install separately)
+dependencies/
+
+# Large input files
+inputs/UKBB/
+inputs/*.vtk
+
+# MATLAB
+
+# Large mesh/data files
+*.vtk
+*.vtu
+*.ply
+*.stl
+*.alg
+*.ensi.*
+*.mat
+*.csv
