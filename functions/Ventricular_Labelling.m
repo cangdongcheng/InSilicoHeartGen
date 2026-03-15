@@ -551,7 +551,7 @@ warning('off','all')
         surfRV.cells=face_surf(labelfinal2==3,:);
         surfRV.points=node_surf;
         surfRV.cellTypes=uint8(ones(length(face_surf(labelfinal2==3)),1)*5);
-        RVaxispulm = computeLongAxis(surfRV, RVaxispulm);
+        RVaxispulm = RVaxispulm / norm(RVaxispulm);
        %project values along long axis
         labelsurf3=labelsurf;
         labelsurf3.pointData.heightRV2 = double(labelsurf.points*RVaxispulm');

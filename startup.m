@@ -1,1 +1,1 @@
-addpath(genpath('C:\Users\e1032484\cobiveco'));
+addpath(genpath('C:\Users\CANG_DONGCHENG\cobiveco'));

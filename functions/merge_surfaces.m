@@ -26,7 +26,7 @@ function labels0=merge_surfaces(Prefix_LV,Prefix_LV_epi,Prefix_RV,case_number)
     save_ply(newnode_epi,newelem_epi-1,'mergedepi');
     [newnode_endo,newelem_endo]=surfboolean(node1,faces1,'union', node3,faces3);
     %save_ply(newnode_endo,newelem_endo-1,'mergedendo');
-    
+
     [newnode_final,newelem_final]=surfboolean(newnode_epi,newelem_epi,'all',newnode_endo,newelem_endo);
     %save_ply(newnode_final,newelem_final-1,'merged_final');
     

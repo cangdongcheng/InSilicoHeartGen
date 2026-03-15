@@ -10,8 +10,8 @@ addpath(genpath(fullfile(current_path, 'dependencies')));
 
 %% configure input data
 
-origpath = fullfile(current_path, 'inputs', 'UKBB'); % path with the surface meshes
-resultspath = fullfile(current_path, 'outputs'); % path with the resulting files and fields
+origpath = fullfile(current_path, 'inputs', 'NUH_test'); % path with the surface meshes
+resultspath = fullfile(current_path, 'outputs', 'NUH_test'); % path with the resulting files and fields
 referenceFolder = fullfile(current_path, 'functions', 'reference_activation'); %reference folder for activation and electrodes
 referenceMonoAlg= fullfile(current_path, 'functions', 'reference_activation'); %reference folder for ini files generation
         
