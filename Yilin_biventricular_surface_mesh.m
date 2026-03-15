@@ -1,4 +1,4 @@
-% This is script which runs the pipeline from endocardial and epicardial surface meshes to
+% This is script which runs the pipeline from an existing biventricular surface mesh to
 % simulation files
 
 clear
@@ -10,77 +10,41 @@ addpath(genpath(fullfile(current_path, 'dependencies')));
 
 %% configure input data
 
-origpath = fullfile(current_path, 'inputs', 'NUH_test'); % path with the surface meshes
-resultspath = fullfile(current_path, 'outputs', 'NUH_test'); % path with the resulting files and fields
+origpath = fullfile(current_path, 'inputs'); % path with the surface meshes
+resultspath = fullfile(current_path, 'outputs'); % path with the resulting files and fields
 referenceFolder = fullfile(current_path, 'functions', 'reference_activation'); %reference folder for activation and electrodes
 referenceMonoAlg= fullfile(current_path, 'functions', 'reference_activation'); %reference folder for ini files generation
         
-Prefix_LV='LV_endo_ex_';   %change according to the format of the input data
-Prefix_LV_epi='LV_epi_ex_';   %change according to the format of the input data
-Prefix_RV='RV_ex_';   %change according to the format of the input data
 
-meshformat='UKBB'  ; %type of mesh  UKBB--> inputs obtained from the UKBB image data
-                   %               cut --> cut biventricular geomtry
-                   %               biventricular_open --> biventricular  with open valves
-                   %               biventricular_closed  --> biventricular  with closed valves (EM simulations) 
+meshformat='closed'  ; %type of mesh  UKBB--> inputs obtained from the UKBB image data
+                   %                cut --> cut biventricular geomtry
+                   %                open --> biventricular  with open valves
+                   %                closed  --> biventricular  with closed valves (EM simulations) 
 
 mesh_resolution_fine=1;
 mesh_resolution_coarse=1.5;
-mesh_resolution_hexa=0.4;
+mesh_resolution_hexa=0.04;
                                  
 %% get files name
 cd(origpath)
-cases = dir([Prefix_LV, '*']);
-case_names=string({cases(:).name})';
-case_numbers=str2double(extract(case_names,digitsPattern));
-total_cases=length(case_numbers);
-
+name_origin='Average_merge_001.vtk'; %name of the original surface
+name_final='Average_merge_001_result';%name of the final mesh and folder
 if ~exist(resultspath,'dir')
   mkdir(resultspath);       
 end
 cd(resultspath)
 
 %% mesh generation
-for index=1:total_cases
-        case_number=case_numbers(index);
-         
-        case_folder = fullfile(resultspath, num2str(case_number));
-        input_folder = fullfile(case_folder, 'input');
-        %% create case folder of input data
-        if ~exist(case_folder, 'dir')
-            mkdir(case_folder);
-            mkdir(input_folder);
-            copyfile(fullfile(origpath, [Prefix_LV, num2str(case_number), '.ply']), input_folder);
-            copyfile(fullfile(origpath, [Prefix_LV_epi, num2str(case_number), '.ply']), input_folder);
-            copyfile(fullfile(origpath, [Prefix_RV, num2str(case_number), '.ply']), input_folder);
-        end
-        
-        
-         %% read mesh
+for index=1
 
-                cd(input_folder);
+    %% read original mesh
 
-                %1 create epicardium of right ventricle
-                add_RV_width(Prefix_RV,3,case_number); 
-                %2 fix LV mitral borders
-                fix_LV_borders(Prefix_LV,case_number);
-                [original_LV_mesh]=readVTK(fullfile(input_folder, [Prefix_LV, num2str(case_number), '.ply']));%used for labelling
+                surf0=vtkRead(fullfile(origpath,name_origin));        
 
-                %3 merge all surfaces
-                labels0=merge_surfaces(Prefix_LV,Prefix_LV_epi,Prefix_RV,case_number);
-                %4 add lid to LV
-                add_lid_LV()
-                %5 Remesh surfaces (important step, it fixes mesh issues)
-                surf_edge_length=1.5;
-                surf0=remesh_surfaces_UKBB(surf_edge_length,case_number);
-
-                %6 Move surfaces meshes to result folder and change directory to
-                %that folder
+                case_folder = fullfile(resultspath, name_final);
+                mkdir(case_folder)
                 cd(case_folder)
-                movefile(fullfile(input_folder, ['Closed_final_', num2str(case_number), '.ply']), case_folder);
-                movefile(fullfile(input_folder, 'labels0.vtk'), case_folder);
-           
-
+               
                 %% generate coarse mesh
 
                 %find unit scale
@@ -94,26 +58,29 @@ for index=1:total_cases
                     disp('scale is in cm -->Units for EM solver and Personalization ')
                     disp('conversion to mm for meshing')
                      surf0.points=surf0.points.*10;
-                     labels0.points=labels0.points.*10;
 
                 else
                     error('check your mesh dimensions (not mm nor cm)')
                 end
                 % if ~exist('coarse.vtu','file')    
-                   %coarse tetrahedral  mesh at 1.5 mm resolution.
+                   %coarse tetrahedral mesh 
                    %find inner points of RV and LV
                     %HOLE 1 (LV)
-                        labelLV=1;
-                        carLV=labels0.cells(labels0.cellData==labelLV,:);
-                        pointsLV=labels0.points(unique(carLV),:);
-                        pt_LV=mean(pointsLV);                   
-                    %HOLE 2 (RV)
-                        labelRV=3;
-                        carRV=labels0.cells(labels0.cellData==labelRV,:);
-                        pointsRV=labels0.points(unique(carRV),:);
-                        pt_RV=mean(pointsRV);
-                   MeshCoarse=tetrahedral_meshing(surf0,mesh_resolution_coarse,pt_LV,pt_RV);
+                    %     labelLV=1;
+                    %     carLV=labels0.cells(labels0.cellData==labelLV,:);
+                    %     pointsLV=labels0.points(unique(carLV),:);
+                    %     pt_LV=mean(pointsLV);                   
+                    % %HOLE 2 (RV)
+                    %     labelRV=3;
+                    %     carRV=labels0.cells(labels0.cellData==labelRV,:);
+                    %     pointsRV=labels0.points(unique(carRV),:);
+                    %     pt_RV=mean(pointsRV);
+                   MeshCoarse=tetrahedral_meshing(surf0,mesh_resolution_coarse,[],[]);
         
+                   disp('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+                   disp('conversion to cm after meshing -->Units for EM solver and Personalization ')
+                   MeshCoarse.points=MeshCoarse.points./10;
+                   disp('units converted to cm')
                    vtkWrite(MeshCoarse, 'Coarse.vtu');
         
                 % else
@@ -121,15 +88,20 @@ for index=1:total_cases
                 % 
                 % end
 
-        %% generate fine mesh
+        %% generate fine 
         disp('generating fine mesh')
                 % if ~exist('fine.vtu','file')
-                   MeshFine=tetrahedral_meshing(surf0,mesh_resolution_fine,pt_LV,pt_RV);    
+                   MeshFine=tetrahedral_meshing(surf0,mesh_resolution_fine,[],[]);    
+                   disp('%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%')
+                   disp('conversion to cm after meshing -->Units for EM solver and Personalization ')
+                   MeshFine.points=MeshFine.points./10;
+                   surf0.points=surf0.points./10;
+                   disp('units converted to cm')
                    vtkWrite(MeshFine, 'fine.vtu');
                 % else
                 %    MeshFine=vtkRead('fine.vtu');
                 % end
-       %% check normals 
+        %% check normals 
                 disp('Checking normals in volumetric meshes')
                 sur_coarse = vtkDataSetSurfaceFilter(MeshCoarse);
                 TR_Surf=triangulation(double(sur_coarse.cells),double(sur_coarse.points));
@@ -156,25 +128,25 @@ for index=1:total_cases
                 end
 
 
-         %% generate Hexa mesh
-          disp('Generating Hexa mesh');
-        [ALG,tet_ID,bar]= hexa_mesher('Coarse.vtu', mesh_resolution_hexa,1);
-        outputmesh = movefile('hex_Coarse.vtk', ['Hexa_', num2str(case_number), '.vtk']);
-        MeshHex = vtkRead(['Hexa_', num2str(case_number), '.vtk']);
 
+         %% generate Hexa mesh
+        disp('Generating Hexa mesh');
+        [ALG,tet_ID,bar]= hexa_mesher('Coarse.vtu', mesh_resolution_hexa,1);
+        outputmesh = movefile('hex_Coarse.vtk', ['Hexa_', name_final, '.vtk']);
+        MeshHex = vtkRead(['Hexa_', name_final, '.vtk']);
+          
 
         
         %% generate labels
          % if ~exist('labels_final.vtk','file')
             disp('generating labels')
-            cd(input_folder)        
-            
-            opt.original_LV_mesh=original_LV_mesh;
+            opt.biggestVentRV=true(1); %the biggest ventricle is RV (true(1). If not, false(1). Most of the "cut" meshes can presente a bigger LV. 
             labelfinal3=Ventricular_Labelling(sur_coarse,meshformat,opt);
 
-            movefile(fullfile(input_folder, 'labels_final.vtk'),fullfile(case_folder, 'labels_final.vtk'));
-            % end
-               
+         % end
+       
+
+        
         
         %% generate fields
         disp('generating fields')
@@ -209,35 +181,36 @@ for index=1:total_cases
         epiendoRV=[70 0 30]; % percentage of endo/ mid/ epi (RV septal wall as epi)
         requiresInterpolation=1; %0--> no need interpolation for a large number of points
                                  %1--> interpolation requiered 
-        Field_generator_UKBB_function24(Fiber_info,meshformat,pericardium_level, epiendo, epiendoRV,requiresInterpolation,case_number);
+        Field_generator_UKBB_function24(Fiber_info,meshformat,pericardium_level, epiendo, epiendoRV,requiresInterpolation,[]);
 
         cd(case_folder)
 
         %% creation of generic files for EM simulations
         %this files and formats are created for specific solvers. Creation
         %for a particular solver will required extra formating
-        % casepath=strcat(resultspath,'/',num2str(case_number),'\',strcat('ensi',num2str(case_number)));
-        % cd(casepath)
 
-        Data4EM=load(fullfile(case_folder, ['ensi_Fine_', num2str(case_number)], 'Case_Fine.mat')) ; %choose between the mesh files  (coarse for EM or fine for EP)
+        Data4EM=load(fullfile(case_folder, 'ensi_Fine_', 'Case_Fine.mat')) ; %choose between the mesh files  (coarse for EM or fine for EP)
 
-        nameEMFolder=['EM_Control_',num2str(case_number)];
-        EMfilespath = fullfile(resultspath, num2str(case_number), nameEMFolder);
+        nameEMFolder=['EM_Control_',name_final];
+
+        EMfilespath = fullfile(resultspath,name_final, nameEMFolder);
 
         Electrodes_final=electrode_generation(Data4EM,referenceFolder);
 
-        name_EM_case = ['heart_', num2str(case_number)];
+        name_EM_case = ['heart_', name_final];
         %AlyaFiles_creation_all(EMfilespath,Data4EM,name_EM_case,referenceEM,Electrodes_final,case_number); %functions for Alya not provided
-      
+
         %%generate activation
         mkdir(EMfilespath)
         BCL=0.8;
         generateActivation(name_EM_case,Data4EM,referenceFolder,EMfilespath,'generic',BCL);
 
+
+
         %% Hexa Files generation
 %         %read field data
-        casepath=fullfile(case_folder, ['ensi', num2str(case_number)]);
-        monodir=fullfile(case_folder, 'MonoAlg3D');
+        casepath=fullfile(resultspath,name_final,'ensi');
+        monodir=fullfile(resultspath,name_final,'MonoAlg3D');
 
         cd(casepath)
         Data=load('Case_coarse.mat');
@@ -245,10 +218,10 @@ for index=1:total_cases
 
         cd(case_folder)
 
-        mkdir(monodir)
-        cd(monodir);
-        %generate ALG file
-        HexaFieldsGeneration_function_cells_v2(monodir,ALG,MeshCoarse,MeshHex,Data,tet_ID,bar,epiendo,epiendoRV,['Fields_',num2str(case_number)]);
+       mkdir(monodir)
+       cd(monodir);
+       %generate ALG file
+       HexaFieldsGeneration_function_cells_v2(monodir,ALG,MeshCoarse,MeshHex,Data,tet_ID,bar,epiendo,epiendoRV,'Fields');
 
 
        %new electrodes
@@ -259,14 +232,13 @@ for index=1:total_cases
        %root nodes
        roots_number=4;
        BCL=0.8;
-       name_mono=['UKBB_',num2str(case_number)];
+       name_mono=['UKBB_',name_final];
        rootnodes=rootnodes_from_IDs(Data,referenceFolder,roots_number);
        rootnodes.time=rootnodes.time-0.02;  %transformation from generic rootnodes (simulations starts at 0.02)
-       %conductance
-       if mesh_resolution_hexa==0.5
+       if mesh_resolution_hexa==0.05
             sigma=[0.000186, 0.000093, 0.000123];          %sigma_l   %sigma_t  %sigma_n
 
-       elseif mesh_resolution_hexa==0.4
+       elseif mesh_resolution_hexa==0.04
 
              sigma=[0.000310, 0.000155, 0.000205];          %sigma_l   %sigma_t  %sigma_n
 
@@ -285,10 +257,10 @@ for index=1:total_cases
        Monoalg_sim.fast_endo_layer_scale=10;
        Monoalg_sim.dt_ode=0.01;
        Monoalg_sim.num_volumes=length(MeshHex.cells);
-       Monoalg_sim.original_discretization=mesh_resolution_hexa*1000;
-       Monoalg_sim.desired_discretization=mesh_resolution_hexa*1000;
+       Monoalg_sim.original_discretization=mesh_resolution_hexa*10000;
+       Monoalg_sim.desired_discretization=mesh_resolution_hexa*10000;
 
-       meshfile=strcat('cluster_mesh_path/',['Fields_',num2str(case_number),'.alg']);
+       meshfile=strcat('cluster_mesh_path/',['Fields_',name_final,'.alg']);
 
        Monoalg_ini_creation(name_mono,monodir,referenceMonoAlg,meshfile,MeshHex,Monoalg_sim,sigma,Electrodes_final_monoAlg,rootnodes)
 

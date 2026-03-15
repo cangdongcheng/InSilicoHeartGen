@@ -4,7 +4,6 @@ outputs/
 # Dependencies (large libraries, install separately)
 dependencies/
 
-# MATLAB
 
 # Large mesh/data files
 *.vtk
