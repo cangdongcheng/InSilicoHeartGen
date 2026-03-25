@@ -107,7 +107,7 @@ function HexaFieldsGeneration_function_cells_v2(monodir,ALG,MeshCoarse,MeshHex,D
 
     % Ventricle tags using Tphi, old Ventricle values and surface_cubes
     % detection
-          Ventricle=single(Tphi); 
+          Ventricle=double(Tphi); 
           Ventricle(Ventricle<0 & Ventricle>-2)=-1; % mio LV =-1
           Ventricle(Ventricle>0 & Ventricle<1)=2;  % mio RV =2 
           Ventricle(surface_cubes==1 & Tphi<0.5 & Ventricle3>0)=3;
@@ -194,7 +194,7 @@ rcos=cos(2*pi*Data.r);
             
             % Choose majority
             lvrv_cobi = w1 > w0;         % logical 0/1 result
-            lvrv_cobi = int8(lvrv_cobi);
+            lvrv_cobi = double(lvrv_cobi);
 
         % a2b_cutpointsTetra=Data.a2b_cut(points_Tetra);
         % a2b_cut=dot(bar,a2b_cutpointsTetra,2);
