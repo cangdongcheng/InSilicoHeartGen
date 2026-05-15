@@ -1,79 +1,104 @@
 % export_vtu.m
-% Attaches all fields from Case_coarse.mat onto Coarse.vtu and writes a
-% single VTU file openable in ParaView.
+% Builds a VTU from CSV files and writes it to the same folder.
+% Usage: set ensi_path below, then run.
+%   ensi_path = 'C:\...\outputs\NUH_test\1\ensi1'
 
 clear
 current_path = pwd;
 addpath(genpath(fullfile(current_path, 'functions')));
 addpath(genpath(fullfile(current_path, 'dependencies')));
 
-%% Configure
-case_number = 1;
-case_folder  = fullfile(current_path, 'outputs', num2str(case_number));
-ensi_folder  = fullfile(case_folder, ['ensi', num2str(case_number)]);
-mesh_file    = fullfile(case_folder, 'Coarse.vtu');
-mat_file     = fullfile(ensi_folder, 'Case_coarse.mat');
-out_file     = fullfile(case_folder, ['Case_coarse_fields_', num2str(case_number), '.vtu']);
+%% ---- SET THIS PATH ----
+ensi_path = 'C:\Users\e1032484\InSilicoHeartGen\outputs\NUH_test\1\ensi_Fine_1';
+%% ------------------------
 
-%% Load verified mesh
-mesh = vtkRead(mesh_file);
-n_nodes = size(mesh.points, 1);
-n_cells = size(mesh.cells, 1);
+csv_dir = fullfile(ensi_path, 'CSVFiles');
+assert(isfolder(csv_dir), 'CSVFiles folder not found in: %s', ensi_path);
+
+% Find the prefix (e.g. "1_coarse") from the xyz file
+xyz_file = dir(fullfile(csv_dir, '*_xyz.csv'));
+assert(~isempty(xyz_file), 'No *_xyz.csv found in %s', csv_dir);
+prefix = erase(xyz_file(1).name, '_xyz.csv');
+fprintf('Prefix: %s\n', prefix);
+
+%% Build mesh from CSVs
+points = csvread(fullfile(csv_dir, [prefix '_xyz.csv']));
+cells  = csvread(fullfile(csv_dir, [prefix '_tetra.csv']));
+n_nodes = size(points, 1);
+n_cells = size(cells, 1);
 fprintf('Mesh: %d nodes, %d cells\n', n_nodes, n_cells);
 
-%% Load fields
-D = load(mat_file);
+mesh.points = points;
+mesh.cells  = int32(cells);
+mesh.cellTypes = repmat(uint8(10), n_cells, 1);  % VTK_TETRA
 
-% Sanity check
-assert(size(D.v,1) == n_nodes, ...
-    'Node count mismatch: Coarse.vtu=%d, Case_coarse.mat=%d', n_nodes, size(D.v,1));
+%% Point data (per-node fields)
+node_fields = {
+    'Fiber',           'nodefield_fibre'
+    'Sheet',           'nodefield_sheet'
+    'Normal',          'nodefield_normal'
+    'Cobiveco',        'cobiveco'
+    'Apex2Base',       'nodefield_cobiveco-ab'
+    'Transmurality',   'nodefield_cobiveco-tm'
+    'Rotational',      'nodefield_cobiveco-rt'
+    'Transventricular','nodefield_cobiveco-tv'
+    'RV2LV_geodesic',  'nodefield_cobiveco-rvlv'
+    'RV2LV_projection','nodefield_cobiveco-rvlv-projection'
+    'Ant2Post',        'nodefield_cobiveco-aprt'
+};
 
-%% Point data (per node)
-mesh = add_point(mesh, 'Fiber',              D.F,           n_nodes);
-mesh = add_point(mesh, 'Sheet',              D.F_S,         n_nodes);
-mesh = add_point(mesh, 'Normal',             D.F_N,         n_nodes);
-mesh = add_point(mesh, 'Transmurality',      D.d3,          n_nodes);
-mesh = add_point(mesh, 'Transmurality_RV',   D.Tphi3,       n_nodes);
-mesh = add_point(mesh, 'Transmurality_bi',   D.Tphi_bi,     n_nodes);
-mesh = add_point(mesh, 'Ventricle',          D.Ventricle,   n_nodes);
-mesh = add_point(mesh, 'Epiendo',            D.Epiendo,     n_nodes);
-mesh = add_point(mesh, 'Epiendo_RV',         D.Epiendo3,    n_nodes);
-mesh = add_point(mesh, 'Apex2Base',          D.a2b,         n_nodes);
-mesh = add_point(mesh, 'Apex2Base_cobi',     D.a2b_cobi,    n_nodes);
-mesh = add_point(mesh, 'Apex2Base_uvc',      D.a2b_uvc,     n_nodes);
-mesh = add_point(mesh, 'Circ_cobi',          D.r,           n_nodes);
-mesh = add_point(mesh, 'LVvsRV_cobi',        D.lvrv_cobi,   n_nodes);
-mesh = add_point(mesh, 'RV2LV_geo',          D.r2l_geo,     n_nodes);
-mesh = add_point(mesh, 'Ant2Post',           D.a2p,         n_nodes);
-mesh = add_point(mesh, 'R2L',                D.r2l,         n_nodes);
-mesh = add_point(mesh, 'Transmurality_cobi', D.tm_cobi,     n_nodes);
-mesh = add_point(mesh, 'Apex2Base_proj',     D.apex_2_base, n_nodes);
-mesh = add_point(mesh, 'AHA',                D.aha,         n_nodes);
+for i = 1:size(node_fields, 1)
+    fname = fullfile(csv_dir, [prefix '_' node_fields{i,2} '.csv']);
+    if isfile(fname)
+        val = csvread(fname);
+        if size(val, 1) == n_nodes
+            mesh.pointData.(node_fields{i,1}) = double(val);
+            fprintf('  + pointData.%s [%dx%d]\n', node_fields{i,1}, size(val));
+        else
+            warning('Skipping pointData.%s: %d rows ~= %d nodes', node_fields{i,1}, size(val,1), n_nodes);
+        end
+    else
+        fprintf('  - pointData.%s not found, skipping\n', node_fields{i,1});
+    end
+end
 
-%% Cell data (per element)
-mesh = add_cell(mesh, 'LVvsRV',    D.lvrv,       n_cells);
-mesh = add_cell(mesh, 'Label',     D.label_fine, n_cells);
-mesh = add_cell(mesh, 'Plug',      D.Plug_tetra, n_cells);
-mesh = add_cell(mesh, 'LabelSet2', D.label_set2, n_cells);
-mesh = add_cell(mesh, 'AHA',       D.aha,        n_cells);
+% Boundary node fields → binary per-node arrays
+boundary_fields = {
+    'EP_LVnodes', 'boundarynodefield_ep-lvnodes'
+    'EP_RVnodes', 'boundarynodefield_ep-rvnodes'
+};
 
-%% Write
+for i = 1:size(boundary_fields, 1)
+    fname = fullfile(csv_dir, [prefix '_' boundary_fields{i,2} '.csv']);
+    if isfile(fname)
+        idx = csvread(fname);
+        flag = zeros(n_nodes, 1);
+        valid = idx(idx >= 1 & idx <= n_nodes);
+        flag(valid) = 1;
+        mesh.pointData.(boundary_fields{i,1}) = double(flag);
+        fprintf('  + pointData.%s [%d flagged nodes]\n', boundary_fields{i,1}, numel(valid));
+    end
+end
+
+%% Cell data (per-element fields)
+cell_fields = {
+    'Material', 'material_tetra'
+};
+
+for i = 1:size(cell_fields, 1)
+    fname = fullfile(csv_dir, [prefix '_' cell_fields{i,2} '.csv']);
+    if isfile(fname)
+        val = csvread(fname);
+        if size(val, 1) == n_cells
+            mesh.cellData.(cell_fields{i,1}) = double(val);
+            fprintf('  + cellData.%s [%dx%d]\n', cell_fields{i,1}, size(val));
+        else
+            warning('Skipping cellData.%s: %d rows ~= %d cells', cell_fields{i,1}, size(val,1), n_cells);
+        end
+    end
+end
+
+%% Write VTU
+out_file = fullfile(ensi_path, [prefix '_fields.vtu']);
 vtkWrite(mesh, out_file);
 fprintf('Written: %s\n', out_file);
-
-%% Helper functions
-function s = add_point(s, name, val, n)
-    if size(val,1) == n
-        s.pointData.(name) = double(val);
-    else
-        warning('Skipping pointData.%s: size %d ~= %d nodes', name, size(val,1), n);
-    end
-end
-
-function s = add_cell(s, name, val, n)
-    if size(val,1) == n
-        s.cellData.(name) = double(val);
-    else
-        warning('Skipping cellData.%s: size %d ~= %d cells', name, size(val,1), n);
-    end
-end
