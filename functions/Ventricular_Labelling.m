@@ -604,31 +604,27 @@ warning('off','all')
                % vtkWrite(labelsurf2, 'labelsurf4.vtp');
 
 %%
-       for percentages=10:-0.5:1
-           label_aux=labelfinal3;
-           P2 = prctile(labelsurf2.cellData.heightLV(labelfinal2==3),percentages);
-           label_aux(labelfinal2==3 & labelsurf2.cellData.heightLV <= P2 )=14;
-           number_clusters_Tricuspid=numel(finddisconnsurf(face_surf(label_aux==14,:)));
-           if number_clusters_Tricuspid>1
-               break
-           end
-       end
-        clusters_Tricuspid=(finddisconnsurf(face_surf(label_aux==14,:)));
-    
-           cluster_Tricusp_1= cat(1, clusters_Tricuspid{1});
-           [~,col_index1]=ismember(cluster_Tricusp_1,face_surf,'rows');
-           values_cluster1=mean(labelsurf.cellData.phipulm_norm(col_index1)); %we discern between two clusters using the distance from the LV apex
-           index_Tricusp=col_index1;
-    
-         if number_clusters_Tricuspid>1 
-           cluster_Tricusp_2= cat(1, clusters_Tricuspid{2});
-           [~,col_index2]=ismember(cluster_Tricusp_2,face_surf,'rows');
-           values_cluster2=mean(labelsurf.cellData.phipulm_norm(col_index2)); %we discern between two clusters using the distance from the LV apex 
-           if values_cluster2 > values_cluster1
-                    index_Tricusp=col_index2;
-           end
-         end
-    
+     %basal band of the RV away from the PV. The previous loop shrank the
+     %band until it split, and then took one of the first two clusters
+     %without checking their size, which often gave a very small TV.
+        heightTri=labelsurf2.cellData.heightLV(:);
+        center_pulm=mean(centroid(labelfinal3==9,:),1);
+        dist_pulm_center=sqrt(sum((centroid-center_pulm).^2,2));
+        radius_pulm=prctile(dist_pulm_center(labelfinal3==9),95);
+        candidates_Tricusp=labelfinal2(:)==3 & labelfinal3(:)~=9 & dist_pulm_center>3*radius_pulm;
+        tricuspid_percentage=8;
+        band_Tricusp=candidates_Tricusp & heightTri<=prctile(heightTri(candidates_Tricusp),tricuspid_percentage);
+        clusters_Tricuspid=finddisconnsurf(face_surf(band_Tricusp,:));
+        size_clusters=cellfun('size',clusters_Tricuspid,1);
+        %among the clusters with at least 25% of the largest size, take the one farthest from the PV
+        values_cluster=-Inf(numel(clusters_Tricuspid),1);
+        for inc=find(size_clusters(:)'>=0.25*max(size_clusters))
+            [~,col_index]=ismember(cat(1,clusters_Tricuspid{inc}),face_surf,'rows');
+            values_cluster(inc)=mean(dist_pulm_center(col_index));
+        end
+        [~,max_index]=max(values_cluster);
+        [~,index_Tricusp]=ismember(cat(1,clusters_Tricuspid{max_index}),face_surf,'rows');
+
         labelfinal3(index_Tricusp)=14;
 
 
