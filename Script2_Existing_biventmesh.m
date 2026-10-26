@@ -16,7 +16,7 @@ referenceFolder = fullfile(current_path, 'functions', 'reference_activation'); %
 referenceMonoAlg= fullfile(current_path, 'functions', 'reference_activation'); %reference folder for ini files generation
         
 
-meshformat='closed'  ; %type of mesh  UKBB--> inputs obtained from the UKBB image data
+meshformat='open'  ; %type of mesh  UKBB--> inputs obtained from the UKBB image data
                    %                cut --> cut biventricular geomtry
                    %                open --> biventricular  with open valves
                    %                closed  --> biventricular  with closed valves (EM simulations) 
@@ -24,11 +24,13 @@ meshformat='closed'  ; %type of mesh  UKBB--> inputs obtained from the UKBB imag
 mesh_resolution_fine=1;
 mesh_resolution_coarse=1.5;
 mesh_resolution_hexa=0.04;
+output_units='mm'; %units of the written geometry: 'mm' or 'cm' (the internal units of the pipeline)
+                   %MonoAlg3D files and the hexahedral mesh keep their solver units
                                  
 %% get files name
 cd(origpath)
-name_origin='IMMC001_20150716_merge_000.vtk'; %name of the original surface
-name_final='test';%name of the final mesh and folder
+name_origin='Bivent0.ply'; %name of the original surface
+name_final='biventricular_0';%name of the final mesh and folder
 if ~exist(resultspath,'dir')
   mkdir(resultspath);       
 end
@@ -180,10 +182,8 @@ for index=1
         epiendo=[70 0 30]; % percentage of endo/ mid/ epi#
         epiendoRV=[70 0 30]; % percentage of endo/ mid/ epi (RV septal wall as epi)
         requiresInterpolation=1; %0--> no need interpolation for a large number of points
-                                 %1--> interpolation requiered
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+                                 %1--> interpolation requiered 
         Field_generator_UKBB_function24(Fiber_info,meshformat,pericardium_level, epiendo, epiendoRV,requiresInterpolation,[]);
-        %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
         cd(case_folder)
 
@@ -266,6 +266,11 @@ for index=1
 
        Monoalg_ini_creation(name_mono,monodir,referenceMonoAlg,meshfile,MeshHex,Monoalg_sim,sigma,Electrodes_final_monoAlg,rootnodes)
 
+
+       %% output units
+       if output_units=="mm"
+           convert_case_outputs_units(case_folder,10,'mm');
+       end
 
        cd(resultspath)
 end

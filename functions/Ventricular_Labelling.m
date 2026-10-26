@@ -546,25 +546,28 @@ warning('off','all')
     LV2RV=mean(centroid(labelfinal3==3,:))-mean(centroid(labelfinal3==2,:));
     
      %find anterior 2 posterior direction
+     %cross(LV2RV,apex direction) points anteriorly in a non-mirrored heart.
+     %It is used directly: computeLongAxis returned the principal axis of the
+     %RV surface and used this vector only for its sign, which moved the PV.
       RVaxispulm=1*cross(LV2RV,RVaxis);
-    % RVaxispulm=LV2RV;
-        surfRV.cells=face_surf(labelfinal2==3,:);
-        surfRV.points=node_surf;
-        surfRV.cellTypes=uint8(ones(length(face_surf(labelfinal2==3)),1)*5);
-        RVaxispulm = RVaxispulm / norm(RVaxispulm);
-       %project values along long axis
+      RVaxispulm=RVaxispulm-(dot(RVaxispulm,RVaxis)/dot(RVaxis,RVaxis))*RVaxis; %perpendicular to the long axis
+      RVaxispulm=RVaxispulm/norm(RVaxispulm);
+       %project values along anterior direction
         labelsurf3=labelsurf;
         labelsurf3.pointData.heightRV2 = double(labelsurf.points*RVaxispulm');
          labelsurf3= vtkPointDataToCellData(labelsurf3);
              % vtkWrite(labelsurf3, 'labelsurf3.vtp');
     warning('on','all')
-        %find center of pulmonary and calculate geodesic
-        [~,Pulm_id_RV22]=max(labelsurf3.cellData.heightRV2(labelfinal2==3));
-        PulmRV_id=find(labelfinal2==3);
+        %score each face by how anterior and how basal it is (both scaled to
+        %[0 1]; heightLV increases towards the apex)
+        heightLVcell=labelsurf.cellData.heightLV(:);
+        anteriorcell=labelsurf3.cellData.heightRV2(:);
+        PulmRV_id=find(labelfinal2(:)==3);
+        [~,Pulm_id_RV22]=max(rescale(anteriorcell(PulmRV_id))+rescale(-heightLVcell(PulmRV_id)));
         PulmRV_id=PulmRV_id(Pulm_id_RV22);
           Pulm_RV_point=face_surf(PulmRV_id,1);
-      [~,Pulm_id_sept]=max(labelsurf3.cellData.heightRV2(labelfinal3==6));
-        PulmRV_id_sept=find(labelfinal3==6);
+        PulmRV_id_sept=find(labelfinal3(:)==6);
+      [~,Pulm_id_sept]=max(rescale(anteriorcell(PulmRV_id_sept))+rescale(-heightLVcell(PulmRV_id_sept)));
         PulmRV_id_sept=PulmRV_id_sept(Pulm_id_sept);
         Pulm_RV_sept_point=face_surf(PulmRV_id_sept,1);
     
@@ -578,6 +581,11 @@ warning('off','all')
       labelsurf= vtkPointDataToCellData(labelsurf);
       % define maximum value of pulmonary valve
       max_limit_pulm=min(labelsurf.cellData.phipulm_norm(labelfinal3==6));
+      %if the PV center touches the septum, almost no face is selected: use
+      %the closest 4% of the RV free wall instead (PV size in the reference case)
+      if nnz(labelsurf.cellData.phipulm_norm(:)<max_limit_pulm & labelfinal3(:)==3) < 0.01*nnz(labelfinal3==3)
+          max_limit_pulm=prctile(labelsurf.cellData.phipulm_norm(labelfinal3==3),4);
+      end
       labelfinal3(labelsurf.cellData.phipulm_norm<max_limit_pulm & labelfinal3==3 )=9;
     
     
@@ -586,7 +594,7 @@ warning('off','all')
     centroid_pulm_endo=meshcentroid(node_surf,face_surf(labelfinal3==9,:));
         TR_pulm_endo=delaunayTriangulation(centroid_pulm_endo);
         [~,dist_pulm]=nearestNeighbor(TR_pulm_endo,centroid);
-        labelfinal3(labelfinal2==1 & dist_pulm< 3.5)=19;
+        labelfinal3(labelfinal2==1 & dist_pulm< 0.35)=19;
     
     
  %% detect tricuspid valve endo, using the plane of the mitral surface
@@ -596,31 +604,27 @@ warning('off','all')
                % vtkWrite(labelsurf2, 'labelsurf4.vtp');
 
 %%
-       for percentages=10:-0.5:1
-           label_aux=labelfinal3;
-           P2 = prctile(labelsurf2.cellData.heightLV(labelfinal2==3),percentages);
-           label_aux(labelfinal2==3 & labelsurf2.cellData.heightLV <= P2 )=14;
-           number_clusters_Tricuspid=numel(finddisconnsurf(face_surf(label_aux==14,:)));
-           if number_clusters_Tricuspid>1
-               break
-           end
-       end
-        clusters_Tricuspid=(finddisconnsurf(face_surf(label_aux==14,:)));
-    
-           cluster_Tricusp_1= cat(1, clusters_Tricuspid{1});
-           [~,col_index1]=ismember(cluster_Tricusp_1,face_surf,'rows');
-           values_cluster1=mean(labelsurf.cellData.phipulm_norm(col_index1)); %we discern between two clusters using the distance from the LV apex
-           index_Tricusp=col_index1;
-    
-         if number_clusters_Tricuspid>1 
-           cluster_Tricusp_2= cat(1, clusters_Tricuspid{2});
-           [~,col_index2]=ismember(cluster_Tricusp_2,face_surf,'rows');
-           values_cluster2=mean(labelsurf.cellData.phipulm_norm(col_index2)); %we discern between two clusters using the distance from the LV apex 
-           if values_cluster2 > values_cluster1
-                    index_Tricusp=col_index2;
-           end
-         end
-    
+     %basal band of the RV away from the PV. The previous loop shrank the
+     %band until it split, and then took one of the first two clusters
+     %without checking their size, which often gave a very small TV.
+        heightTri=labelsurf2.cellData.heightLV(:);
+        center_pulm=mean(centroid(labelfinal3==9,:),1);
+        dist_pulm_center=sqrt(sum((centroid-center_pulm).^2,2));
+        radius_pulm=prctile(dist_pulm_center(labelfinal3==9),95);
+        candidates_Tricusp=labelfinal2(:)==3 & labelfinal3(:)~=9 & dist_pulm_center>3*radius_pulm;
+        tricuspid_percentage=8;
+        band_Tricusp=candidates_Tricusp & heightTri<=prctile(heightTri(candidates_Tricusp),tricuspid_percentage);
+        clusters_Tricuspid=finddisconnsurf(face_surf(band_Tricusp,:));
+        size_clusters=cellfun('size',clusters_Tricuspid,1);
+        %among the clusters with at least 25% of the largest size, take the one farthest from the PV
+        values_cluster=-Inf(numel(clusters_Tricuspid),1);
+        for inc=find(size_clusters(:)'>=0.25*max(size_clusters))
+            [~,col_index]=ismember(cat(1,clusters_Tricuspid{inc}),face_surf,'rows');
+            values_cluster(inc)=mean(dist_pulm_center(col_index));
+        end
+        [~,max_index]=max(values_cluster);
+        [~,index_Tricusp]=ismember(cat(1,clusters_Tricuspid{max_index}),face_surf,'rows');
+
         labelfinal3(index_Tricusp)=14;
 
 
@@ -628,7 +632,7 @@ warning('off','all')
         centroid_tri_endo=meshcentroid(node_surf,face_surf(labelfinal3==14,:));
         TR_tri_endo=delaunayTriangulation(centroid_tri_endo);
         [~,dist_tri]=nearestNeighbor(TR_tri_endo,centroid);
-        labelfinal3(labelfinal2==1 & dist_tri< 3.5)=24;
+        labelfinal3(labelfinal2==1 & dist_tri< 0.35)=24;
 
         labelfinals=labelfinal3;
 
