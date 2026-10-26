@@ -27,6 +27,8 @@ meshformat='UKBB'  ; %type of mesh  UKBB--> inputs obtained from the UKBB image 
 mesh_resolution_fine=1;
 mesh_resolution_coarse=1.5;
 mesh_resolution_hexa=0.04;
+output_units='mm'; %units of the written geometry: 'mm' or 'cm' (the internal units of the pipeline)
+                   %MonoAlg3D files and the hexahedral mesh keep their solver units
                                  
 %% get files name
 cd(origpath)
@@ -302,6 +304,11 @@ for index=1:total_cases
 
        Monoalg_ini_creation(name_mono,monodir,referenceMonoAlg,meshfile,MeshHex,Monoalg_sim,sigma,Electrodes_final_monoAlg,rootnodes)
 
+
+       %% output units
+       if output_units=="mm"
+           convert_case_outputs_units(case_folder,10,'mm');
+       end
 
        cd(resultspath)
 end

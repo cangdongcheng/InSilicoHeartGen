@@ -546,25 +546,30 @@ warning('off','all')
     LV2RV=mean(centroid(labelfinal3==3,:))-mean(centroid(labelfinal3==2,:));
     
      %find anterior 2 posterior direction
+     %cross(LV2RV,apex direction) points anteriorly in a non-mirrored heart.
+     %It is used directly: computeLongAxis returned the principal axis of the
+     %RV surface and used this vector only for its sign, which moved the PV.
       RVaxispulm=1*cross(LV2RV,RVaxis);
-    % RVaxispulm=LV2RV;
-        surfRV.cells=face_surf(labelfinal2==3,:);
-        surfRV.points=node_surf;
-        surfRV.cellTypes=uint8(ones(length(face_surf(labelfinal2==3)),1)*5);
-        RVaxispulm = computeLongAxis(surfRV, RVaxispulm);
-       %project values along long axis
+      RVaxispulm=RVaxispulm-(dot(RVaxispulm,RVaxis)/dot(RVaxis,RVaxis))*RVaxis; %perpendicular to the long axis
+      RVaxispulm=RVaxispulm/norm(RVaxispulm);
+       %project values along anterior direction
         labelsurf3=labelsurf;
         labelsurf3.pointData.heightRV2 = double(labelsurf.points*RVaxispulm');
          labelsurf3= vtkPointDataToCellData(labelsurf3);
              % vtkWrite(labelsurf3, 'labelsurf3.vtp');
     warning('on','all')
-        %find center of pulmonary and calculate geodesic
-        [~,Pulm_id_RV22]=max(labelsurf3.cellData.heightRV2(labelfinal2==3));
-        PulmRV_id=find(labelfinal2==3);
+        %basal band of the RV (heightLV increases towards the apex)
+        basal_percentage=5;
+        heightLVcell=labelsurf.cellData.heightLV(:);
+        basalRV=labelfinal2(:)==3 & heightLVcell<=prctile(heightLVcell(labelfinal2(:)==3),basal_percentage);
+        basalSept=labelfinal3(:)==6 & heightLVcell<=prctile(heightLVcell(labelfinal3(:)==6),basal_percentage);
+        %find center of pulmonary (most anterior basal point) and calculate geodesic
+        PulmRV_id=find(basalRV);
+        [~,Pulm_id_RV22]=max(labelsurf3.cellData.heightRV2(PulmRV_id));
         PulmRV_id=PulmRV_id(Pulm_id_RV22);
           Pulm_RV_point=face_surf(PulmRV_id,1);
-      [~,Pulm_id_sept]=max(labelsurf3.cellData.heightRV2(labelfinal3==6));
-        PulmRV_id_sept=find(labelfinal3==6);
+        PulmRV_id_sept=find(basalSept);
+      [~,Pulm_id_sept]=max(labelsurf3.cellData.heightRV2(PulmRV_id_sept));
         PulmRV_id_sept=PulmRV_id_sept(Pulm_id_sept);
         Pulm_RV_sept_point=face_surf(PulmRV_id_sept,1);
     
