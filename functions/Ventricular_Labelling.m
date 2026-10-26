@@ -583,6 +583,11 @@ warning('off','all')
       labelsurf= vtkPointDataToCellData(labelsurf);
       % define maximum value of pulmonary valve
       max_limit_pulm=min(labelsurf.cellData.phipulm_norm(labelfinal3==6));
+      %if the PV center touches the septum, almost no face is selected: use
+      %the closest 4% of the RV free wall instead (PV size in the reference case)
+      if nnz(labelsurf.cellData.phipulm_norm(:)<max_limit_pulm & labelfinal3(:)==3) < 0.01*nnz(labelfinal3==3)
+          max_limit_pulm=prctile(labelsurf.cellData.phipulm_norm(labelfinal3==3),4);
+      end
       labelfinal3(labelsurf.cellData.phipulm_norm<max_limit_pulm & labelfinal3==3 )=9;
     
     
