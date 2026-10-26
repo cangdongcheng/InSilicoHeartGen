@@ -558,18 +558,16 @@ warning('off','all')
          labelsurf3= vtkPointDataToCellData(labelsurf3);
              % vtkWrite(labelsurf3, 'labelsurf3.vtp');
     warning('on','all')
-        %basal band of the RV (heightLV increases towards the apex)
-        basal_percentage=5;
+        %score each face by how anterior and how basal it is (both scaled to
+        %[0 1]; heightLV increases towards the apex)
         heightLVcell=labelsurf.cellData.heightLV(:);
-        basalRV=labelfinal2(:)==3 & heightLVcell<=prctile(heightLVcell(labelfinal2(:)==3),basal_percentage);
-        basalSept=labelfinal3(:)==6 & heightLVcell<=prctile(heightLVcell(labelfinal3(:)==6),basal_percentage);
-        %find center of pulmonary (most anterior basal point) and calculate geodesic
-        PulmRV_id=find(basalRV);
-        [~,Pulm_id_RV22]=max(labelsurf3.cellData.heightRV2(PulmRV_id));
+        anteriorcell=labelsurf3.cellData.heightRV2(:);
+        PulmRV_id=find(labelfinal2(:)==3);
+        [~,Pulm_id_RV22]=max(rescale(anteriorcell(PulmRV_id))+rescale(-heightLVcell(PulmRV_id)));
         PulmRV_id=PulmRV_id(Pulm_id_RV22);
           Pulm_RV_point=face_surf(PulmRV_id,1);
-        PulmRV_id_sept=find(basalSept);
-      [~,Pulm_id_sept]=max(labelsurf3.cellData.heightRV2(PulmRV_id_sept));
+        PulmRV_id_sept=find(labelfinal3(:)==6);
+      [~,Pulm_id_sept]=max(rescale(anteriorcell(PulmRV_id_sept))+rescale(-heightLVcell(PulmRV_id_sept)));
         PulmRV_id_sept=PulmRV_id_sept(Pulm_id_sept);
         Pulm_RV_sept_point=face_surf(PulmRV_id_sept,1);
     
